@@ -24,10 +24,6 @@ data class ChatRequestDto(
 data class ChatResponseDto(val reply: String)
 
 interface ChatApi {
-    // Hits YOUR backend only. The backend holds the real provider key server-side —
-    // the app never talks to the AI provider directly and never embeds a secret.
-    // Authorization carries the app-level shared secret the backend's requireAppAuth expects
-    // (see jarvis-backend/server.js) — NOT a provider API key.
     @POST("chat")
     suspend fun chat(
         @retrofit2.http.Header("Authorization") auth: String,
@@ -48,8 +44,6 @@ object NetworkModule {
         })
         .build()
 
-    /** Settings dashboard lets the user override the backend URL (Phase 9); falls back
-     *  to the build-time default so the app works out of the box. */
     fun apiFor(baseUrl: String): ChatApi {
         val url = baseUrl.ifBlank { BuildConfig.BACKEND_BASE_URL }
         val normalized = if (url.endsWith("/")) url else "$url/"
@@ -66,6 +60,19 @@ class ChatRepositoryImpl(private val prefs: PreferencesManager) : ChatRepository
     override suspend fun sendMessage(message: String, history: List<ChatMessage>, memories: List<String>): Result<String> =
         try {
             val p = prefs.prefsFlow.first()
+            val effectiveUrl = p.backendUrl.ifBlank { BuildConfig.BACKEND_BASE_URL }
+
+            if (effectiveUrl.contains("your-backend.example.com")) {
+                return Result.failure(
+                    Exception("No AI backend configured yet. Go to Settings -> AI Provider and enter your deployed backend URL and auth token (see jarvis-backend/README.md to deploy one)."),
+                )
+            }
+            if (p.backendAuthToken.isBlank()) {
+                return Result.failure(
+                    Exception("Backend URL is set, but no auth token is configured. Go to Settings -> AI Provider and enter the APP_SHARED_SECRET you set on your backend."),
+                )
+            }
+
             val api = NetworkModule.apiFor(p.backendUrl)
             val dto = ChatRequestDto(
                 message = message,
@@ -73,11 +80,21 @@ class ChatRepositoryImpl(private val prefs: PreferencesManager) : ChatRepository
                 language = com.jarvis.assistant.util.LanguageManager.backendLanguageTag(p.language),
                 memories = if (p.memoryEnabled) memories else emptyList(),
             )
-            Result.success(api.chat("Bearer ${p.backendAuthToken}", dto).reply)
+            val response = api.chat("Bearer ${p.backendAuthToken}", dto)
+            Result.success(response.reply)
         } catch (e: SocketTimeoutException) {
-            Result.failure(Exception("AI service timed out. Please try again."))
+            Result.failure(Exception("AI service timed out. Your backend may be asleep (free-tier hosts do this) - try again in a few seconds."))
+        } catch (e: retrofit2.HttpException) {
+            val detail = when (e.code()) {
+                401 -> "Backend rejected the request - your auth token in Settings doesn't match the backend's APP_SHARED_SECRET."
+                404 -> "Backend URL reached, but /chat endpoint wasn't found - check the URL in Settings has no typo."
+                else -> "Backend returned an error (HTTP ${e.code()})."
+            }
+            Result.failure(Exception(detail))
+        } catch (e: java.net.UnknownHostException) {
+            Result.failure(Exception("Can't reach that backend URL - check it's correct and your backend is actually deployed and running."))
         } catch (e: IOException) {
-            Result.failure(Exception("AI service unavailable — check your connection."))
+            Result.failure(Exception("AI service unavailable - check your internet connection."))
         } catch (e: Exception) {
             Result.failure(Exception(e.message ?: "AI service unavailable"))
         }
