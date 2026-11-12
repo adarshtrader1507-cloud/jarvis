@@ -9,10 +9,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.jarvis.assistant.BuildConfig
 import com.jarvis.assistant.data.prefs.AppLanguage
+import com.jarvis.assistant.data.prefs.ConnectivityMode
 import com.jarvis.assistant.viewmodel.SettingsViewModel
 
 private val Cyan = Color(0xFF34E8FF)
@@ -79,9 +79,21 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         )
 
         SectionTitle("Online / Offline")
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Force offline mode", color = Color.White, modifier = Modifier.weight(1f))
-            Switch(checked = prefs.forceOfflineMode, onCheckedChange = { viewModel.setForceOffline(it) })
+        Text(
+            "Auto uses your phone's real connection. Force Online skips that check if it's wrong for your network; Force Offline always shows offline.",
+            color = Color.White.copy(alpha = 0.6f),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+        Row {
+            ConnectivityMode.entries.forEach { mode ->
+                FilterChip(
+                    selected = prefs.connectivityMode == mode,
+                    onClick = { viewModel.setConnectivityMode(mode) },
+                    label = { Text(mode.label) },
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+            }
         }
 
         SectionTitle("Memory & Privacy")

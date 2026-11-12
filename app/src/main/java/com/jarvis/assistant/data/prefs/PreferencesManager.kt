@@ -17,30 +17,29 @@ enum class AppLanguage(val tag: String, val label: String) {
     HINGLISH("en-IN", "Hinglish"),
 }
 
+enum class ConnectivityMode(val tag: String, val label: String) {
+    AUTO("auto", "Auto"),
+    FORCE_ONLINE("force_online", "Force Online"),
+    FORCE_OFFLINE("force_offline", "Force Offline"),
+}
+
 data class JarvisPrefs(
     val language: AppLanguage = AppLanguage.ENGLISH,
     val speechRate: Float = 1.0f,
     val animationIntensity: Float = 1.0f,
-    val forceOfflineMode: Boolean = false,
+    val connectivityMode: ConnectivityMode = ConnectivityMode.AUTO,
     val memoryEnabled: Boolean = true,
     val backendUrl: String = "",
     val backendAuthToken: String = "",
 )
 
-/**
- * Single DataStore-backed source for every Settings-dashboard toggle (Phase 9).
- * Nothing here is decorative — every value read here is actually consumed:
- * language -> SpeechRecognizer/TTS locale, speechRate -> TextToSpeech.setSpeechRate,
- * animationIntensity -> AiFace draw scale, forceOfflineMode -> ConnectivityObserver override,
- * memoryEnabled -> gates MemoryRepository writes, backendUrl -> overrides BuildConfig default.
- */
 class PreferencesManager(private val context: Context) {
 
     private object Keys {
         val LANGUAGE = stringPreferencesKey("language")
         val SPEECH_RATE = floatPreferencesKey("speech_rate")
         val ANIM_INTENSITY = floatPreferencesKey("anim_intensity")
-        val FORCE_OFFLINE = booleanPreferencesKey("force_offline")
+        val CONNECTIVITY_MODE = stringPreferencesKey("connectivity_mode")
         val MEMORY_ENABLED = booleanPreferencesKey("memory_enabled")
         val BACKEND_URL = stringPreferencesKey("backend_url")
         val BACKEND_AUTH_TOKEN = stringPreferencesKey("backend_auth_token")
@@ -51,7 +50,8 @@ class PreferencesManager(private val context: Context) {
             language = AppLanguage.entries.find { it.tag == p[Keys.LANGUAGE] } ?: AppLanguage.ENGLISH,
             speechRate = p[Keys.SPEECH_RATE] ?: 1.0f,
             animationIntensity = p[Keys.ANIM_INTENSITY] ?: 1.0f,
-            forceOfflineMode = p[Keys.FORCE_OFFLINE] ?: false,
+            connectivityMode = ConnectivityMode.entries.find { it.tag == p[Keys.CONNECTIVITY_MODE] }
+                ?: ConnectivityMode.AUTO,
             memoryEnabled = p[Keys.MEMORY_ENABLED] ?: true,
             backendUrl = p[Keys.BACKEND_URL] ?: "",
             backendAuthToken = p[Keys.BACKEND_AUTH_TOKEN] ?: "",
@@ -61,7 +61,8 @@ class PreferencesManager(private val context: Context) {
     suspend fun setLanguage(language: AppLanguage) = context.dataStore.edit { it[Keys.LANGUAGE] = language.tag }
     suspend fun setSpeechRate(rate: Float) = context.dataStore.edit { it[Keys.SPEECH_RATE] = rate }
     suspend fun setAnimationIntensity(v: Float) = context.dataStore.edit { it[Keys.ANIM_INTENSITY] = v }
-    suspend fun setForceOffline(v: Boolean) = context.dataStore.edit { it[Keys.FORCE_OFFLINE] = v }
+    suspend fun setConnectivityMode(mode: ConnectivityMode) =
+        context.dataStore.edit { it[Keys.CONNECTIVITY_MODE] = mode.tag }
     suspend fun setMemoryEnabled(v: Boolean) = context.dataStore.edit { it[Keys.MEMORY_ENABLED] = v }
     suspend fun setBackendUrl(url: String) = context.dataStore.edit { it[Keys.BACKEND_URL] = url }
     suspend fun setBackendAuthToken(token: String) = context.dataStore.edit { it[Keys.BACKEND_AUTH_TOKEN] = token }

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jarvis.assistant.data.local.repository.ConversationRepository
 import com.jarvis.assistant.data.local.repository.MemoryRepository
+import com.jarvis.assistant.data.prefs.ConnectivityMode
 import com.jarvis.assistant.data.prefs.JarvisPrefs
 import com.jarvis.assistant.data.prefs.PreferencesManager
 import com.jarvis.assistant.domain.model.AiState
@@ -38,12 +39,14 @@ class JarvisViewModel(
     val prefs: StateFlow<JarvisPrefs> = preferencesManager.prefsFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, JarvisPrefs())
 
-    // Real connectivity + the user's "force offline" setting combine into one truth.
     val connectivity: StateFlow<ConnectivityState> = combine(
         connectivityObserver.observe(), prefs,
     ) { online, p ->
-        if (p.forceOfflineMode) ConnectivityState.OFFLINE
-        else if (online) ConnectivityState.ONLINE else ConnectivityState.OFFLINE
+        when (p.connectivityMode) {
+            ConnectivityMode.FORCE_ONLINE -> ConnectivityState.ONLINE
+            ConnectivityMode.FORCE_OFFLINE -> ConnectivityState.OFFLINE
+            ConnectivityMode.AUTO -> if (online) ConnectivityState.ONLINE else ConnectivityState.OFFLINE
+        }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, ConnectivityState.OFFLINE)
 
     init {
