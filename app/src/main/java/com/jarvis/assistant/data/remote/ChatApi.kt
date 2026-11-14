@@ -57,7 +57,11 @@ object NetworkModule {
 }
 
 class ChatRepositoryImpl(private val prefs: PreferencesManager) : ChatRepository {
-    override suspend fun sendMessage(message: String, history: List<ChatMessage>, memories: List<String>): Result<String> =
+    override suspend fun sendMessage(
+        message: String,
+        history: List<ChatMessage>,
+        memories: List<String>,
+    ): Result<String> {
         try {
             val p = prefs.prefsFlow.first()
             val effectiveUrl = p.backendUrl.ifBlank { BuildConfig.BACKEND_BASE_URL }
@@ -81,21 +85,22 @@ class ChatRepositoryImpl(private val prefs: PreferencesManager) : ChatRepository
                 memories = if (p.memoryEnabled) memories else emptyList(),
             )
             val response = api.chat("Bearer ${p.backendAuthToken}", dto)
-            Result.success(response.reply)
+            return Result.success(response.reply)
         } catch (e: SocketTimeoutException) {
-            Result.failure(Exception("AI service timed out. Your backend may be asleep (free-tier hosts do this) - try again in a few seconds."))
+            return Result.failure(Exception("AI service timed out. Your backend may be asleep (free-tier hosts do this) - try again in a few seconds."))
         } catch (e: retrofit2.HttpException) {
             val detail = when (e.code()) {
                 401 -> "Backend rejected the request - your auth token in Settings doesn't match the backend's APP_SHARED_SECRET."
                 404 -> "Backend URL reached, but /chat endpoint wasn't found - check the URL in Settings has no typo."
                 else -> "Backend returned an error (HTTP ${e.code()})."
             }
-            Result.failure(Exception(detail))
+            return Result.failure(Exception(detail))
         } catch (e: java.net.UnknownHostException) {
-            Result.failure(Exception("Can't reach that backend URL - check it's correct and your backend is actually deployed and running."))
+            return Result.failure(Exception("Can't reach that backend URL - check it's correct and your backend is actually deployed and running."))
         } catch (e: IOException) {
-            Result.failure(Exception("AI service unavailable - check your internet connection."))
+            return Result.failure(Exception("AI service unavailable - check your internet connection."))
         } catch (e: Exception) {
-            Result.failure(Exception(e.message ?: "AI service unavailable"))
+            return Result.failure(Exception(e.message ?: "AI service unavailable"))
         }
+    }
 }
