@@ -57,7 +57,7 @@ app.post("/chat", requireAppAuth, async (req, res) => {
   const systemPrompt = "You are JARVIS, a helpful personal AI assistant running inside an Android app. " + languageInstruction + " Keep answers conversational and reasonably concise since they may be read aloud by text-to-speech." + memoryText;
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", systemInstruction: systemPrompt });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", systemInstruction: systemPrompt });
     const prompt = historyText ? "Conversation so far:\n" + historyText + "\n\nUser: " + message : message;
     const result = await model.generateContent(prompt);
     const reply = result.response.text();
